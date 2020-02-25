@@ -1,0 +1,95 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+ # install.packages("tidyverse")
+ # install.packages("funModeling")
+ # install.packages("Hmisc")
+```
+
+```{r}
+# EDA specific librar
+library(funModeling) 
+library(tidyverse) 
+library(Hmisc)
+
+# To read the file
+library("readxl")
+```
+
+
+```{r}
+##Read CSV file
+setwd("/Users/i078014/Inayath/GreatLearning/rprogramming/work/capstone/dataset")
+library("readxl")
+```
+
+```{r}
+infestationData <- read_xlsx("Final Dataset_Pest Infestation.xlsx", sheet = "Sheet2")
+
+```
+
+```{r}
+View(infestationData)
+
+```
+
+```{r}
+head(infestationData, n=10) ##first 10 observations
+```
+```{r}
+str(infestationData)
+```
+
+# Checking for missing values
+```{r}
+sum(is.na(infestationData))
+```
+If any values missing, where ?
+```{r}
+
+sapply(infestationData, function(x) sum(is.na(x)))
+```
+
+```{r}
+basic_eda <- function(data)
+{
+  glimpse(data)
+  df_status(data)
+  freq(data) 
+  profiling_num(data)
+  plot_num(data)
+  describe(data)
+}
+```
+
+```{r}
+basic_eda(infestationData)
+```
+
+
+```{r}
+glimpse(infestationData)
+```
+
+```{r}
+df_status(infestationData)
+```
+
+```{r}
+freq(infestationData)
+```
+
+```{r}
+plot_num(infestationData)
+```
+
+```{r}
+data_prof=profiling_num(infestationData)
+
+data_prof
+```
+
