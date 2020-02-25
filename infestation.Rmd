@@ -93,3 +93,38 @@ data_prof=profiling_num(infestationData)
 data_prof
 ```
 
+```{r}
+# Total rows
+nrow(infestationData)
+```
+
+```{r}
+# Total columns
+ncol(infestationData)
+```
+
+```{r}
+# Column names
+colnames(infestationData)
+```
+
+```{r}
+correlation_table(data=infestationData, target="Pest_value")
+```
+
+# Replace NA values by 0 in Pest_Value, RH2 and EVP
+```{r}
+
+# Replacing NA values with 0 only in selected columns
+vars_to_replace=c("Pest_value", "RH2(%)", "EVP(mm)")
+
+infestationData_1 =infestationData %>% mutate_at(.vars=vars_to_replace, .funs = funs(ifelse(is.na(.), 0, .)))
+
+df_status(infestationData_1)
+
+```
+
+
+
+
+
