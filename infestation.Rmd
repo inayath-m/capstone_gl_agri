@@ -1,39 +1,98 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Predict Crop Infestation - Interim report"
+author: "Group 6"
+output:
+  word_document: default
+  pdf_document: default
 ---
-
 
 ```{r}
  # install.packages("tidyverse")
  # install.packages("funModeling")
  # install.packages("Hmisc")
+install.packages("pastecs")
 ```
 
 ```{r}
-# EDA specific librar
+# EDA specific library
 library(funModeling) 
 library(tidyverse) 
 library(Hmisc)
+library(DataExplorer)
 
 # To read the file
 library("readxl")
+library(dplyr)
+
+
+library(pastecs)
+library(psych)
+library(tidyverse)
 ```
 
 
 ```{r}
-##Read CSV file
+##Read XLSX file
 setwd("/Users/i078014/Inayath/GreatLearning/rprogramming/work/capstone/dataset")
-library("readxl")
-```
-
-```{r}
-infestationData <- read_xlsx("Final Dataset_Pest Infestation.xlsx", sheet = "Sheet2")
 
 ```
 
+
 ```{r}
-View(infestationData)
+infestationData <- read_xlsx("Final Dataset_Pest Infestation_29-Feb_2020.xlsx", sheet = "Sheet2")
+
+infestationData_actual <-infestationData
+
+```
+
+```{r}
+names(infestationData)
+```
+
+```{r}
+infestationData %>% 
+  group_by(Crop) %>% 
+  summarise(counts = n())
+```
+
+```{r}
+# install.packages("onehot")
+# library(onehot)
+# install.packages("CatEncoders")
+
+install.packages("fastDummies")
+library(fastDummies)
+
+```
+
+
+```{r}
+## Convert character fields to factrs
+# encoder <- onehot(infestationData, stringsAsFactors=TRUE, addNA=TRUE)
+
+#infestationData = onehot(infestationData, stringsAsFactors = TRUE, addNA = TRUE, max_levels = 10)
+## limit which factors are onehot encoded
+#encoder <- onehot(infestationData, max_levels=5)
+
+infestationData<-dummy_cols(
+infestationData,
+select_columns = c("Crop","State","Distict","Growth_stage","Season_K_R","Pest_Name"),
+remove_first_dummy = FALSE,
+remove_most_frequent_dummy = FALSE,
+ignore_na = FALSE,
+split = NULL,
+remove_selected_columns = FALSE
+)
+
+```
+
+```{r}
+infestationData<-filter(infestationData, Crop == "Cotton")
+```
+
+
+```{r}
+ View(infestationData)
 
 ```
 
@@ -44,15 +103,51 @@ head(infestationData, n=10) ##first 10 observations
 str(infestationData)
 ```
 
+
+```{r}
+dim(infestationData)
+```
+
+
 # Checking for missing values
 ```{r}
 sum(is.na(infestationData))
 ```
-If any values missing, where ?
+# If any values missing, where ?
 ```{r}
 
 sapply(infestationData, function(x) sum(is.na(x)))
 ```
+
+```{r}
+#install.packages("psycho")
+#install.packages("standardize")
+```
+
+```{r}
+nearZeroVar(infestationData)
+```
+
+
+```{r}
+infestationData$Infestation_Index<-scale(infestationData$Infestation_Index)
+infestationData$Max_Temp<-scale(infestationData$Max_Temp)
+infestationData$Min_Temp<-scale(infestationData$Min_Temp)
+infestationData$RH1_per<-scale(infestationData$RH1_per)
+infestationData$RH2_per<-scale(infestationData$RH2_per)
+infestationData$RF_mm<-scale(infestationData$RF_mm)
+infestationData$WS<-scale(infestationData$WS)
+infestationData$SSH<-scale(infestationData$SSH)
+infestationData$EVP<-scale(infestationData$EVP)
+infestationData$Cloud_Cover<-scale(infestationData$Cloud_Cover)
+infestationData$Soil_Nitrogen<-scale(infestationData$Soil_Nitrogen)
+infestationData$Soil_phosporous<-scale(infestationData$Soil_phosporous)
+infestationData$Soil_Potassium<-scale(infestationData$Soil_Potassium)
+
+#infestationData$Infestation_Index
+```
+
+
 
 ```{r}
 basic_eda <- function(data)
@@ -71,21 +166,1039 @@ basic_eda(infestationData)
 ```
 
 
+
 ```{r}
-glimpse(infestationData)
+
+
+infestationData$Infestation_Index_New <-  ifelse(infestationData$Infestation_Index > 0, 1, 0) 
+
+infestationData$Infestation_Index_New <- as.factor(infestationData$Infestation_Index_New)
+
+str(infestationData$Infestation_Index_New)
+```
+
+
+```{r}
+ggplot(infestationData, aes(Crop)) + 
+  geom_bar(aes(fill = infestationData$Infestation_Index_New)) +
+  labs(title = "Crops with infestation percentage", y = "Percent", x = "Crops")
+
+#ggplot(df, eas(x= factor(x1), fill = factor(x2))) + geom_bar(position=position_dodge())
+
+ggplot(infestationData, aes(x= Crop, fill = factor(infestationData$Infestation_Index_New)), fill='Crop') +
+  #geom_bar(aes(fill = infestationData$Infestation_Index_New)) +
+   geom_bar(position=position_dodge()) +
+ # geom_bar(aes(y = (..count..)/sum(..count..))) +
+  #geom_bar(stat="identity") +
+  #geom_text(aes(y = ((..count..)/sum(..count..)), label = scales::percent((..count..)/sum(..count..))), stat = "count", vjust = -0.25) +
+  #scale_y_continuous(labels = percent) +
+  labs(title = "Crops with infestation percentage", y = "Percent", x = "Crops")
+
+
+ggplot(infestationData, aes(x=as.factor(Crop), fill=as.factor(infestationData$Infestation_Index_New)))+
+  geom_bar(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..]), position="dodge" ) +
+  geom_text(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..], label=scales::percent(..count../tapply(..count.., ..x.. ,sum)[..x..]) ),
+            stat="count", position=position_dodge(0.9), vjust=-0.5)+
+  ylab('Percent of Crop Group, %') +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Crops with infestation percentage", y = "Percent", x = "Crops",fill = "Infestation") 
+
+
 ```
 
 ```{r}
-df_status(infestationData)
+ggplot(infestationData, aes(x=as.factor(State), fill=as.factor(infestationData$Infestation_Index_New)))+
+  geom_bar(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..]), position="dodge" ) +
+  geom_text(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..], label=scales::percent(..count../tapply(..count.., ..x.. ,sum)[..x..]) ),
+            stat="count", position=position_dodge(0.9), vjust=-0.5)+
+  ylab('Percent of Statewise, %') +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Statewise crops with infestation percentage", y = "Percent", x = "State",fill = "Infestation") 
 ```
 
 ```{r}
-freq(infestationData)
+ggplot(infestationData, aes(x=as.factor(Distict), fill=as.factor(infestationData$Infestation_Index_New)))+
+  geom_bar(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..]), position="dodge" ) +
+  geom_text(aes( y=..count../tapply(..count.., ..x.. ,sum)[..x..], label=scales::percent(..count../tapply(..count.., ..x.. ,sum)[..x..]) ),
+            stat="count", position=position_dodge(0.9), vjust=-0.5)+
+  ylab('Percent of Districtwise, %') +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Districtwise crops with infestation percentage", y = "Percent", x = "State",fill = "Infestation") 
+```
+
+
+
+```{r}
+summary(infestationData)
+```
+
+
+
+```{r}
+library(e1071)
+```
+
+
+```{r}
+ggplot(data = infestationData, aes(Infestation_Index)) + geom_histogram()
+
+skewness(infestationData$Infestation_Index)
 ```
 
 ```{r}
-plot_num(infestationData)
+library(party)
 ```
+
+
+```{r}
+names(infestationData)
+```
+
+
+```{r}
+library(party)
+cf1 <- cforest(Infestation_Index_New ~ Crop_Cotton+Crop_Rice+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous , data= infestationData, control=cforest_unbiased(mtry=2,ntree=100)) # fit the random forest
+varimp(cf1)
+```
+
+```{r}
+varimp(cf1, conditional=TRUE)
+```
+
+```{r}
+install.packages("relaimpo")
+```
+
+
+```{r}
+library(relaimpo)
+lmMod <- lm(Infestation_Index~ Crop_Cotton+Crop_Rice+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous, data = infestationData)  # fit lm() model
+relImportance <- calc.relimp(lmMod, type = "lmg", rela = TRUE)  # calculate relative importance scaled to 100
+sort(relImportance$lmg, decreasing=TRUE)  # relative importance
+```
+
+
+```{r}
+lmMod <- lm(Infestation_Index ~ Crop_Cotton+Crop_Rice+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous , data = infestationData)
+selectedMod <- step(lmMod)
+summary(selectedMod)
+```
+
+```{r}
+all_vifs <- car::vif(selectedMod)
+print(all_vifs)
+```
+
+
+```{r}
+signif_all <- names(all_vifs)
+
+# Remove vars with VIF> 4 and re-build model until none of VIFs don't exceed 4.
+while(any(all_vifs > 4)){
+  var_with_max_vif <- names(which(all_vifs == max(all_vifs)))  # get the var with max vif
+  signif_all <- signif_all[!(signif_all) %in% var_with_max_vif]  # remove
+   myForm <- as.formula(paste("Infestation_Index ~ ", paste (signif_all, collapse=" + "), sep=""))  # new formula
+  selectedMod <- lm(myForm, data=infestationData)  # re-build model with new formula
+  all_vifs <- car::vif(selectedMod)
+}
+
+summary(selectedMod)
+
+car::vif(selectedMod)
+
+```
+
+
+```{r}
+all_vars <- names(selectedMod[[1]])[-1]  # names of all X variables
+# Get the non-significant vars
+summ <- summary(selectedMod)  # model summary
+pvals <- summ[[4]][, 4]  # get all p values
+not_significant <- character()  # init variables that aren't statsitically significant
+not_significant <- names(which(pvals > 0.1))
+not_significant <- not_significant[!not_significant %in% "(Intercept)"]  # remove 'intercept'. Optional!
+
+# If there are any non-significant variables, 
+while(length(not_significant) > 0){
+  all_vars <- all_vars[!all_vars %in% not_significant[1]]
+  myForm <- as.formula(paste("Infestation_Index ~ ", paste (all_vars, collapse=" + "), sep=""))  # new formula
+  selectedMod <- lm(myForm, data=infestationData)  # re-build model with new formula
+  
+  # Get the non-significant vars.
+  summ <- summary(selectedMod)
+  pvals <- summ[[4]][, 4]
+  not_significant <- character()
+  not_significant <- names(which(pvals > 0.1))
+  not_significant <- not_significant[!not_significant %in% "(Intercept)"]
+}
+summary(selectedMod)
+```
+
+
+```{r}
+library(caret)
+
+colnames_sub <- c("Infestation_Index","Infestation_Index_New", "Max_Temp", "Min_Temp", "RH1_per", "RH2_per","RF_mm","WS","SSH","EVP","Cloud_Cover","Soil_Nitrogen","Soil_Potassium","Soil_phosporous")
+infestationData_subset <- subset(infestationData,,colnames_sub)
+ 
+preproc1 <- preProcess(infestationData_subset, method=c("center", "scale"))
+ 
+norm1 <- predict(preproc1, infestationData_subset)
+ 
+summary(norm1)
+```
+
+
+```{r}
+fivenum(infestationData$Min_Temp)
+describe(infestationData$Min_Temp)
+```
+
+```{r}
+stat.desc(infestationData$Min_Temp )
+```
+
+
+```{r}
+
+infestationData$RH2_per[is.na(infestationData$RH2_per)] <- median(infestationData$RH2_per, na.rm = T) 
+infestationData$EVP[is.na(infestationData$EVP)] <- median(infestationData$EVP, na.rm = T) 
+
+```
+
+
+```{r}
+
+infestationData$Season_K_R[is.na(infestationData$Season_K_R)] <- mode(infestationData$Season_K_R) 
+
+infestationData$Growth_stage[is.na(infestationData$Growth_stage)] <- mode(infestationData$Growth_stage) 
+
+```
+
+
+
+```{r}
+packageVersion("ggthemes")
+
+library(ggthemes)
+```
+
+ 
+```{r}
+
+with(infestationData, boxplot(infestationData$Min_Temp, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = Min_Temp))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "Minimum Temperature", x = "Infestation") +
+  ggtitle("Boxplot of Minimum Temperature against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$Min_Temp) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$Min_Temp)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Minimum Temperature", x = "Infestation") +
+  ggtitle("Boxplot of Minimum Temperature against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$Min_Temp)) + geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Minimum Temperature", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$Min_Temp)
+
+```
+ 
+ 
+```{r}
+
+with(infestationData, boxplot(infestationData$Max_Temp, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = Max_Temp))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "Maximum Temperature", x = "Infestation") +
+  ggtitle("Boxplot of Maximum Temperature against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$Max_Temp) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$Max_Temp)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Maximum Temperature", x = "Infestation") +
+  ggtitle("Boxplot of Maximum Temperature against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$Max_Temp)) + geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Maximum Temperature", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$Max_Temp)
+```
+ 
+```{r}
+with(infestationData, boxplot(infestationData$RH1_per, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = RH1_per))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "RH-1 ", x = "Infestation") +
+  ggtitle("Boxplot of Relative Humidity-1 against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$RH1_per) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', mean(y), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$RH1_per)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "RH-1", x = "Infestation") +
+  ggtitle("Boxplot of Relative Humidity against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$RH1_per))  + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "RH-1 Temperature", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$RH1_per)
+```
+ 
+```{r}
+with(infestationData, boxplot(infestationData$RH2_per, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = RH2_per))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "RH-2 ", x = "Infestation") +
+  ggtitle("Boxplot of Relative Humidity-2 against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$RH2_per) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', mean(y), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$RH2_per)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "RH-2", x = "Infestation") +
+  ggtitle("Boxplot of Relative Humidity against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$RH2_per))  + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "RH-2 Temperature", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$RH2_per)
+```
+ 
+```{r}
+with(infestationData, boxplot(infestationData$RF_mm, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = RF_mm))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "Rainfall ", x = "Infestation") +
+  ggtitle("Boxplot of Rainfall against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$RF_mm) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$RF_mm)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Rainfall", x = "Infestation") +
+  ggtitle("Boxplot of Rainfall against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$RF_mm))  + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Rainfall", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$RF_mm)
+```
+ 
+```{r}
+with(infestationData, boxplot(infestationData$WS, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = WS))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "Windspeed ", x = "Infestation") +
+  ggtitle("Boxplot of Windspeed against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$WS) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$WS)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Windspeed", x = "Infestation") +
+  ggtitle("Boxplot of Windspeed against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$WS))  + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Windspeed", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$WS)
+```
+ 
+```{r}
+with(infestationData, boxplot(infestationData$SSH, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = SSH))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "Sunshine in Hrs ", x = "Infestation") +
+  ggtitle("Boxplot of Sunshine against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$SSH) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$SSH)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Sunshine in Hrs", x = "Infestation") +
+  ggtitle("Boxplot of Sunshine against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$SSH))  + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Sunshine in Hrs", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$SSH)
+```
+ 
+```{r}
+with(infestationData, boxplot(infestationData$EVP, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = EVP))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "Evaporation ", x = "Infestation") +
+  ggtitle("Boxplot of Evaporation against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$EVP) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$EVP)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Evaporration", x = "Infestation") +
+  ggtitle("Boxplot of Evaporation against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$EVP))  + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Evaporation", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$EVP)
+```
+ 
+```{r}
+with(infestationData, boxplot(infestationData$Cloud_Cover, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y = Cloud_Cover))  +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   # geom_jitter(alpha = 0.3, color = "tomato") +
+  labs(y = "Cloud Cover ", x = "Infestation") +
+  ggtitle("Boxplot of Cloud Cover against Infestation") +
+  coord_flip()
+
+
+stat_box_data <- function(y, upper_limit = max(infestationData$Cloud_Cover) * 1.15) {
+  return( 
+    data.frame(
+      y = 0.95 * upper_limit,
+      label = paste('count =', length(y), '\n',
+                    'mean =', round(mean(y), 1), '\n')
+    )
+  )
+}
+
+ggplot(infestationData, aes(x = Infestation_Index_New, y = infestationData$Cloud_Cover)) + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Cloud Cover", x = "Infestation") +
+  ggtitle("Boxplot of Cloud Cover against Infestation") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+  
+
+
+ggplot(data = infestationData, mapping = aes(x = Infestation_Index_New, y =  infestationData$Cloud_Cover))  + 
+  geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+   geom_violin(fill = "#4271AE", colour = "#1F3552", alpha = 0) +
+  stat_summary(
+    fun.data = stat_box_data, 
+    geom = "text", 
+    hjust = 0.5,
+    vjust = 0.9
+  ) + 
+  labs(y = "Cloud Cover", x = "Infestation") +
+  ggtitle("Boxplot with Distribution") +
+  coord_flip() +
+  theme_fivethirtyeight() 
+    #geom_jitter(alpha = 0.3, color = "tomato")
+
+summary(infestationData$Cloud_Cover)
+```
+ 
+ 
+```{r}
+
+outliers <-boxplot(infestationData$Min_Temp, plot=FALSE)$out
+
+# Check the results
+
+print(outliers)
+```
+ 
+```{r}
+x <- infestationData$Min_Temp
+qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(x, na.rm = T)
+x[x < (qnt[1] - H)] <- caps[1]
+x[x > (qnt[2] + H)] <- caps[2]
+
+infestationData$Min_Temp<-x
+
+```
+ 
+ 
+ 
+```{r}
+infestationData[which(infestationData$Min_Temp %in% outliers),]
+
+```
+ 
+```{r}
+infestationData <- infestationData[-which(infestationData$Min_Temp %in% outliers),]
+```
+ 
+ 
+```{r}
+
+with(infestationData, boxplot(infestationData$Max_Temp, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = Max_Temp)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of Max Temperature for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = Max_Temp)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+
+
+```
+
+```{r}
+
+x <- infestationData$Max_Temp
+qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(x, na.rm = T)
+x[x < (qnt[1] - H)] <- caps[1]
+x[x > (qnt[2] + H)] <- caps[2]
+
+infestationData$Max_Temp<-x
+```
+
+
+```{r}
+outliers <-boxplot(infestationData$Max_Temp, plot=FALSE)$out
+# Check the results
+print(outliers)
+```
+
+```{r}
+infestationData[which(infestationData$Max_Temp %in% outliers),]
+```
+
+```{r}
+infestationData <- infestationData[-which(infestationData$Max_Temp %in% outliers),]
+```
+
+
+```{r}
+outliers <-boxplot(infestationData$RH1_per, plot=FALSE)$out
+
+# Check the results
+
+print(outliers)
+```
+
+```{r}
+infestationData[which(infestationData$RH1_per %in% outliers),]
+```
+
+```{r}
+infestationData <- infestationData[-which(infestationData$RH1_per %in% outliers),]
+```
+
+
+```{r}
+
+with(infestationData, boxplot(infestationData$RH1_per, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = RH1_per)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of Relative Humidity-1 for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = RH1_per)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+```
+
+```{r}
+x <- infestationData$RH1_per
+qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(x, na.rm = T)
+x[x < (qnt[1] - H)] <- caps[1]
+x[x > (qnt[2] + H)] <- caps[2]
+
+infestationData$RH1_per<-x
+```
+
+
+```{r}
+outliers <-boxplot(infestationData$RH1_per, plot=FALSE)$out
+
+# Check the results
+
+print(outliers)
+```
+
+
+
+```{r}
+
+with(infestationData, boxplot(infestationData$RH2_per, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = RH2_per)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of Relative Humidity-2 for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = RH2_per)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+```
+
+```{r}
+outliers <-boxplot(infestationData$RF_mm, plot=FALSE)$out
+
+# Check the results
+
+print(outliers)
+```
+
+```{r}
+infestationData[which(infestationData$RF_mm %in% outliers),]
+```
+
+```{r}
+infestationData <- infestationData[-which(infestationData$RF_mm %in% outliers),]
+```
+
+
+```{r}
+
+with(infestationData, boxplot(infestationData$RF_mm, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = RF_mm)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of Rainfall for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = RF_mm)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+```
+
+```{r}
+x <- infestationData$RF_mm
+qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(x, na.rm = T)
+x[x < (qnt[1] - H)] <- caps[1]
+x[x > (qnt[2] + H)] <- caps[2]
+
+infestationData$RF_mm<-x
+```
+
+
+```{r}
+outliers <-boxplot(infestationData$WS, plot=FALSE)$out
+
+# Check the results
+
+print(outliers)
+```
+
+```{r}
+infestationData[which(infestationData$WS %in% outliers),]
+```
+
+```{r}
+infestationData <- infestationData[-which(infestationData$WS %in% outliers),]
+```
+
+
+```{r}
+
+with(infestationData, boxplot(infestationData$WS, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = WS)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of Wind speed for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = WS)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+```
+
+```{r}
+x <- infestationData$WS
+qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(x, na.rm = T)
+x[x < (qnt[1] - H)] <- caps[1]
+x[x > (qnt[2] + H)] <- caps[2]
+
+infestationData$WS<-x
+```
+
+
+```{r}
+
+with(infestationData, boxplot(infestationData$SSH, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = SSH)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of SSH Temperature for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = SSH)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+```
+
+```{r}
+outliers <-boxplot(infestationData$EVP, plot=FALSE)$out
+
+# Check the results
+
+print(outliers)
+```
+
+```{r}
+infestationData[which(infestationData$EVP %in% outliers),]
+```
+
+```{r}
+infestationData <- infestationData[-which(infestationData$EVP %in% outliers),]
+```
+
+
+```{r}
+
+with(infestationData, boxplot(infestationData$EVP, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = EVP)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of Evaporation for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = EVP)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+```
+
+```{r}
+x <- infestationData$EVP
+qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(x, na.rm = T)
+x[x < (qnt[1] - H)] <- caps[1]
+x[x > (qnt[2] + H)] <- caps[2]
+
+infestationData$EVP<-x
+```
+
+
+```{r}
+
+with(infestationData, boxplot(infestationData$Cloud_Cover, col="grey", pars=list(outcol="red"), horizontal = TRUE))
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = Cloud_Cover)) + geom_boxplot() +
+   geom_boxplot( fill = "#4271AE", colour = "#1F3552", alpha = 0.7,outlier.colour = "#1F3552", outlier.shape = 20) +
+    geom_jitter(alpha = 0.3, color = "tomato") +
+  ggtitle("Boxplot of Cloud Cover for a given pest")
+
+
+ggplot(data = infestationData, mapping = aes(x = Pest_Name, y = Cloud_Cover)) + geom_boxplot() +
+   geom_violin(alpha = 0) +
+    geom_jitter(alpha = 0.3, color = "tomato")
+```
+
+```{r}
+outliers <-boxplot(infestationData$Cloud_Cover, plot=FALSE)$out
+
+# Check the results
+
+print(outliers)
+```
+
+```{r}
+infestationData[which(infestationData$Cloud_Cover %in% outliers),]
+```
+
+```{r}
+infestationData <- infestationData[-which(infestationData$Cloud_Cover %in% outliers),]
+```
+
+
 
 ```{r}
 data_prof=profiling_num(infestationData)
@@ -93,38 +1206,529 @@ data_prof=profiling_num(infestationData)
 data_prof
 ```
 
+
 ```{r}
-# Total rows
-nrow(infestationData)
+correlation_table(data=norm1, target="Infestation_Index")
 ```
 
 ```{r}
-# Total columns
-ncol(infestationData)
+infestationData = norm1
 ```
 
-```{r}
-# Column names
-colnames(infestationData)
-```
 
 ```{r}
-correlation_table(data=infestationData, target="Pest_value")
-```
-
-# Replace NA values by 0 in Pest_Value, RH2 and EVP
-```{r}
-
-# Replacing NA values with 0 only in selected columns
-vars_to_replace=c("Pest_value", "RH2(%)", "EVP(mm)")
-
-infestationData_1 =infestationData %>% mutate_at(.vars=vars_to_replace, .funs = funs(ifelse(is.na(.), 0, .)))
-
-df_status(infestationData_1)
-
+plot_str(infestationData)
 ```
 
 
 
+```{r}
+plot_missing(infestationData)
+```
+
+```{r}
+plot_histogram(infestationData)
+```
 
 
+```{r}
+plot_density(infestationData)
+```
+
+
+```{r}
+library(corrplot)
+#library(ggcorrplot)
+
+#install.packages("ggcorrplot")
+```
+
+```{r}
+mod <- lm(Infestation_Index ~ ., data=infestationData)
+cooksd <- cooks.distance(mod)
+```
+
+```{r}
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+```
+
+```{r}
+influential <- as.numeric(names(cooksd)[(cooksd > 4*mean(cooksd, na.rm=T))])  # influential row numbers
+head(infestationData[influential, ])  # influential observations.
+```
+
+```{r}
+car::outlierTest(mod)
+```
+
+
+```{r}
+
+colnames_sub <- c("Infestation_Index_New", "RH1_per", "SSH", "EVP", "Cloud_Cover","Soil_Nitrogen","Soil_Potassium","Soil_phosporous","EVP","Cloud_Cover","Soil_Nitrogen","Soil_Potassium","Soil_phosporous")
+infestationData_subset <- subset(infestationData,,colnames_sub)
+
+res1 <- cor.mtest(infestationData_subset, conf.level = .99)
+res2 <- cor.mtest(infestationData_subset, conf.level = .95)
+
+corrplot(cor(infestationData_subset),type='upper',method='color',addCoef.col = "black",tl.col = "black", number.cex = 0.6, mar=c(0,0,0,0), na.label = "o",p.mat = res1$p, sig.level = .3)
+```
+
+
+```{r}
+#library(e1071)
+apply(infestationData_subset, 2, skewness)
+```
+
+
+
+```{r}
+
+#infestationData$Infestation_Index <-  ifelse(infestationData$Infestation_Index > 0, log(infestationData$Infestation_Index), 0) 
+#infestationData$RF_mm <- ifelse(infestationData$RF_mm > 0, log(infestationData$RF_mm), 0) 
+
+```
+
+```{r}
+
+infestationData$Infestation_Index <- log(infestationData$Infestation_Index + 1)
+
+#infestationData$Max_Temp <- log(infestationData$Max_Temp + 1)
+#infestationData$RF_mm <- log(infestationData$RF_mm + 1)
+#infestationData$RH1_per <- log(infestationData$RH1_per + 1)
+#infestationData$WS <- log(infestationData$WS + 1)
+#infestationData$EVP <- log(infestationData$EVP + 1)
+#infestationData$Soil_phosporous <- log(infestationData$Soil_phosporous + 1)
+
+infestationData$RH1_per <- log(infestationData$RH1_per + 1)
+
+
+```
+
+
+```{r}
+
+hist( infestationData_actual$Infestation_Index[ !infestationData_actual$Infestation_Index==0 ],
+main="Infestion Index view ",
+xlab="Infestation_Index",
+#xlim=c(50,100),
+col="darkmagenta",
+freq=FALSE
+)
+```
+
+
+```{r}
+hist( infestationData$Infestation_Index[ !infestationData$Infestation_Index==0 ],
+      main="Infestion Index view ",
+xlab="Infestation_Index",
+#xlim=c(50,100),
+col="darkmagenta",
+freq=FALSE)
+```
+
+
+```{r}
+plot_bar(infestationData)
+```
+
+```{r}
+#create_report(infestationData)
+```
+
+
+
+```{r}
+panel.cor <- function(x, y, digits=3, prefix="", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits=digits)[1]
+    txt <- paste(prefix, txt, sep="")
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+```
+
+
+```{r}
+
+ggplot(infestationData, aes(Max_Temp, Infestation_Index)) +
+  geom_point() +
+geom_smooth(method="gam", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2) +
+   labs(y = "Infestation Index ", x = "Maximum Temp") +
+  ggtitle("Plot Maximum Temperature against Infestation Index") +
+  guides(color = guide_legend("Model Type"))
+
+ggplot(infestationData, aes( Min_Temp,Infestation_Index) ) +
+  geom_point() +
+  stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+ggplot(infestationData, aes(RH1_per,Infestation_Index) ) +
+  geom_point() +
+ stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+ggplot(infestationData, aes(RH2_per,Infestation_Index) ) +
+  geom_point() +
+  stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+ggplot(infestationData, aes( WS, Infestation_Index) ) +
+  geom_point() +
+  stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+ggplot(infestationData, aes(RF_mm, Infestation_Index) ) +
+  geom_point() +
+  stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+ggplot(infestationData, aes(Soil_Nitrogen, Infestation_Index) ) +
+  geom_point() +
+  stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+ggplot(infestationData, aes(Soil_Potassium,Infestation_Index) ) +
+  geom_point() +
+  stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+ggplot(infestationData, aes(Soil_phosporous,Infestation_Index) ) +
+  geom_point() +
+  stat_smooth(method = 'gam') +
+  geom_smooth(method="lm", formula= (y ~ exp(x)), se=FALSE, color=1) +
+geom_smooth(method="lm", formula= (log(1+y) ~ x), se=FALSE, color=2)
+
+```
+
+```{r}
+
+linear.model <-lm(Infestation_Index ~ Max_Temp, infestationData)
+log.model <-lm(log(1+Infestation_Index) ~ Max_Temp, infestationData)
+exp.model <-lm(Infestation_Index ~ exp(Max_Temp), infestationData)
+
+log.model.df <- data.frame(x = infestationData$Max_Temp,
+                           y = exp(fitted(log.model)))
+
+ggplot(infestationData, aes(x=infestationData$Max_Temp, y=infestationData$Infestation_Index)) + 
+  geom_point() +
+  geom_smooth(method="lm", aes(color="Exp Model"), formula= (infestationData$Infestation_Index ~ exp(infestationData$Max_Temp)), se=FALSE, linetype = 1) +
+  geom_line(data = log.model.df, aes(infestationData$Max_Temp, infestationData$Infestation_Index, color = "Log Model"), size = 1, linetype = 2) + 
+  guides(color = guide_legend("Model Type"))
+```
+
+```{r}
+names(infestationData)
+```
+
+
+```{r}
+ggplot(infestationData, aes(x = Max_Temp, y = Infestation_Index)) +
+    geom_point(shape = 18, color = "steelblue", size = 4) +
+theme(legend.position="top") +
+  geom_text(x = 3, y = 30, label = "Scatter plot",
+              color="red")
+```
+
+```{r}
+
+my_graph <- ggplot(infestationData, aes(x = RH2_per, y = Infestation_Index)) +
+            geom_point() +
+    scale_y_continuous(limits=c(0,3))
+    stat_smooth(method = "lm",
+        col = "#C42126",
+        se = FALSE,
+        size = 1)
+my_graph
+
+```
+
+
+```{r}
+install.packages("datarium")#Packages need to be installed only once
+install.packages("caTools")
+install.packages("ggplot2") 
+install.packages("GGally")
+
+```
+
+```{r}
+library(caTools)
+```
+
+
+```{r}
+#Global Variable
+splitRatio = 0.75
+#Splitting The Data
+set.seed(101)# Set Seed so that same sample can be reproduced in future also
+#Now Selecting 75% of data as sample from total 'n' rows of the data
+sample = sample.split(infestationData$Infestation_Index, SplitRatio = splitRatio)
+train = subset(infestationData, sample == TRUE)
+test = subset(infestationData, sample == FALSE)
+train_size = dim(train)
+test_size = dim(test)
+```
+
+
+```{r}
+#creating the model
+Model <- lm(Infestation_Index ~Crop_Cotton+Crop_Rice+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous, data = train)
+
+summary(Model)
+# Make predictions
+predictions <- Model %>% predict(test)
+# Model performance
+data.frame(
+  RMSE = RMSE(predictions, test$Infestation_Index),
+  R2 = R2(predictions, test$Infestation_Index)
+)
+
+
+```
+
+```{r}
+table(infestationData$Infestation_Index_New)
+```
+
+```{r}
+#Global Variable
+splitRatio = 0.75
+#Splitting The Data
+set.seed(101)# Set Seed so that same sample can be reproduced in future also
+#Now Selecting 75% of data as sample from total 'n' rows of the data
+sample = sample.split(infestationData$Infestation_Index_New, SplitRatio = splitRatio)
+train = subset(infestationData, sample == TRUE)
+test = subset(infestationData, sample == FALSE)
+train_size = dim(train)
+test_size = dim(test)
+```
+
+```{r}
+# Create Training Data
+input_ones <- infestationData[which(infestationData$Infestation_Index_New == 1), ]  # all 1's
+input_zeros <- infestationData[which(infestationData$Infestation_Index_New == 0), ]  # all 0's
+set.seed(100)  # for repeatability of samples
+input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones))  # 1's for training
+input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))  # 0's for training. Pick as many 0's as 1's
+training_ones <- input_ones[input_ones_training_rows, ]  
+training_zeros <- input_zeros[input_zeros_training_rows, ]
+trainingData <- rbind(training_ones, training_zeros)  # row bind the 1's and 0's 
+
+# Create Test Data
+test_ones <- input_ones[-input_ones_training_rows, ]
+test_zeros <- input_zeros[-input_zeros_training_rows, ]
+testData <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's 
+```
+
+
+```{r}
+logitMod <- glm(Infestation_Index_New ~Crop_Cotton+Crop_Rice+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous, data=train, family=binomial(link="logit"))
+
+predicted <- plogis(predict(logitMod, test))  # predicted scores
+# or
+predicted <- predict(logitMod, test, type="response")  # predicted scores
+```
+
+```{r}
+#install.packages("InformationValue")
+```
+
+
+```{r}
+#library(InformationValue)
+optCutOff <- optimalCutoff(test$Infestation_Index_New, predicted)[1] 
+
+optCutOff
+
+```
+
+
+```{r}
+summary(logitMod)
+```
+
+```{r}
+#library(car)
+vif(logitMod)
+```
+
+
+```{r}
+library(caret)
+theme_set(theme_classic())
+```
+
+```{r}
+misClassError(test$Infestation_Index_New, predicted, threshold = optCutOff)
+```
+
+```{r}
+plotROC(test$Infestation_Index_New, predicted)
+```
+
+```{r}
+Concordance(test$Infestation_Index_New, predicted)
+```
+
+```{r}
+sensitivity(test$Infestation_Index_New, predicted, threshold = optCutOff)
+
+specificity(test$Infestation_Index_New, predicted, threshold = optCutOff)
+
+```
+
+```{r}
+confusionMatrix(test$Infestation_Index_New, predicted, threshold = optCutOff)
+```
+
+
+```{r}
+# Build the model
+model <- lm(Infestation_Index ~ Crop_Cotton+Crop_Rice+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous, data = infestationData_train)
+
+summary(model)
+
+# Make predictions
+predictions <- model %>% predict(infestationData_test)
+# Model performance
+data.frame(
+  RMSE = RMSE(predictions, infestationData_test$Infestation_Index),
+  R2 = R2(predictions, infestationData_test$Infestation_Index)
+)
+
+
+```
+
+
+```{r}
+library(mgcv)
+lm_gam <- gam(Infestation_Index ~ Crop_Cotton+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous,data=infestationData_train)
+prediction_lm <- predict(lm_gam, infestationData_test, type="response")
+
+summary(lm_gam)
+
+plot(prediction_lm, main = "")
+
+data.frame(
+  RMSE = RMSE(prediction_lm, infestationData_test$Infestation_Index),
+  R2 = R2(prediction_lm, infestationData_test$Infestation_Index)
+)
+
+```
+
+
+```{r}
+
+model_poly = lm(Infestation_Index ~ poly(Max_Temp, degree=7, raw=TRUE) +
+                                    poly(Min_Temp, degree=9, raw=TRUE) +
+                                    poly(RH1_per, degree=7, raw=TRUE)  +
+                                   poly(RH2_per, degree=2, raw=TRUE)  +
+                                    poly(RF_mm, degree=9, raw=TRUE)  +
+                                    poly(WS, degree=9, raw=TRUE)  +
+                                    poly(SSH, degree=2, raw=TRUE)  +
+                                    poly(EVP, degree=2, raw=TRUE)  +
+                                    poly(Soil_Nitrogen, degree=9, raw=TRUE)  +
+                                    poly(Soil_Potassium, degree=9, raw=TRUE)  +
+                                    poly(Soil_phosporous, degree=9, raw=TRUE)  +
+                                    poly(Crop_Cotton, degree=1, raw=TRUE)  +
+                  poly(Crop_Maize, degree=1, raw=TRUE)  +
+                 # poly(Standard_week, degree=1, raw=TRUE)  +
+                  poly(Standard_Month, degree=2, raw=TRUE)  +
+                #  poly(Distict_Akola, degree=1, raw=TRUE)  +
+                   poly(State_Maharashtra, degree=1, raw=TRUE)  +
+                  # poly(Distict_Nagpur, degree=1, raw=TRUE)  +
+                  # poly(Growth_stage_0, degree=1, raw=TRUE)  +
+                  poly(Growth_stage_character, degree=1, raw=TRUE)  +
+                  poly(Growth_stage_Growth, degree=1, raw=TRUE)  +
+                  poly(Growth_stage_Harvesting, degree=1, raw=TRUE)  +
+                 # poly(Growth_stage_No, degree=1, raw=TRUE)  +
+                  poly(Season_K_R_Khariff, degree=1, raw=TRUE)  +
+                                    poly(Cloud_Cover, degree=2, raw=TRUE)  
+                , data=infestationData_train)
+
+  
+#  model_poly_lm
+  summary(model_poly)
+```
+
+
+```{r}
+#predict(model_poly, infestationData_test)
+
+predictions <- model_poly %>% predict(infestationData_test)
+# Model performance
+data.frame(
+  RMSE = RMSE(predictions, infestationData_test$Infestation_Index),
+  R2 = R2(predictions, infestationData_test$Infestation_Index)
+)
+```
+
+
+```{r}
+library(randomForest)
+
+
+tree_rf <- Infestation_Index ~ Crop_Cotton+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous
+model_rf <- randomForest(tree_rf, data=infestationData_train, ntree=100,proximity=T, do.trace=10,na.action = na.omit)
+
+VI_F=importance(model_rf)
+VI_F
+
+varImp(model_rf)
+
+varImpPlot(model_rf)
+plot(model_rf, main = "")
+# Making predictions
+prediction_rf <- predict(model_rf, infestationData_test)
+model_rf_output <- cbind(infestationData_test, prediction_rf)
+
+# RMSE
+RMSE_lm <- sqrt(mean((model_lm_output$Infestation_Index - model_lm_output$prediction_lm)^2,na.rm=TRUE))
+print(RMSE_lm)
+
+data.frame(
+  RMSE = RMSE(prediction_rf, infestationData_test$Infestation_Index),
+  R2 = R2(prediction_rf, infestationData_test$Infestation_Index)
+)
+
+```
+
+```{r}
+library(caret)
+fitControl <- trainControl(method = "cv", number = 50)
+tune_Grid <-  expand.grid(interaction.depth = 2, n.trees = 500, shrinkage = 0.1, n.minobsinnode = 10)
+
+tree_gbm <- Infestation_Index ~ Crop_Cotton+Standard_week+Standard_Month+State_Maharashtra+State_TamilNadu+Max_Temp+Min_Temp+RH1_per+RH2_per+Distict_Akola+Distict_Coimbatore+Distict_Guntur+Distict_Nagpur+Distict_Pharbani+Growth_stage_character+Growth_stage_Growth+RF_mm+WS+SSH+EVP+Growth_stage_Harvesting+Growth_stage_No+Growth_stage_Sowing+Season_K_R_0+Season_K_R_character+Season_K_R_Khariff+Cloud_Cover+Soil_Nitrogen+Soil_Potassium+Soil_phosporous
+model_gbm <- train(tree_gbm, data = infestationData_train, method = "gbm", trControl = fitControl, verbose = FALSE, na.action = na.omit,)
+
+```
+1
+
+```{r}
+model_gbm
+summary(model_gbm)
+
+```
+
+```{r}
+predictions <- model_gbm %>% predict(infestationData_test)
+RMSE = RMSE(predictions, infestationData_test$Infestation_Index)
+RMSE
+
+R2 = R2(predictions, infestationData_test$Infestation_Index)
+R2
+
+```
